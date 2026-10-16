@@ -9,4 +9,6 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || undefined,
   geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
   seedDemo: process.env.SEED_DEMO !== 'false',
+  // Built frontend to serve alongside the API (only present after `npm run build` in frontend/).
+  staticDir: process.env.STATIC_DIR ?? '../frontend/dist',
 };

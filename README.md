@@ -71,10 +71,16 @@ validation, overlap rules, the host view, and fires 8 simultaneous bookings at o
 
 ## Deploying
 
-`render.yaml` is a Render Blueprint: **New → Blueprint → select the repo**. It creates a free Postgres database, the API,
-and the static site. After the first deploy, set `VITE_API_URL` on the web service to the API URL, and `CORS_ORIGIN` (plus
-`GEMINI_API_KEY`) on the API, then redeploy. Any other combination also works, e.g. frontend on Vercel/Netlify
-(root `frontend`, build `npm run build`, output `dist`) and database on Neon.
+Production is **one Render web service + a Supabase Postgres database**. NestJS serves the API under `/api`
+and the built React app at `/`, so there's a single URL and no CORS setup.
+
+1. **Supabase:** create a free project, then **Connect → Session pooler** and copy the URI. Add your password
+   and append `?sslmode=no-verify`. Tables are created on first boot, with RLS enabled so Supabase's public
+   Data API can't read them.
+2. **Render:** **New → Blueprint →** select this repo (`render.yaml`). Paste the URI as `DATABASE_URL`, and
+   optionally a `GEMINI_API_KEY`.
+
+The free Render plan sleeps after 15 minutes idle, so the first visit can take about 50 s to wake up.
 
 ## How it works
 

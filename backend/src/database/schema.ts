@@ -24,4 +24,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   confirmation_message TEXT,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Supabase exposes the public schema through its Data API. With RLS on and no policies,
+-- that API can read nothing; this server connects as the table owner, which bypasses RLS.
+ALTER TABLE slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 `;
