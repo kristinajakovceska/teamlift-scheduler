@@ -22,8 +22,16 @@ export function CalendarStatusNote() {
     );
   }
   return (
-    <p className="small hero-note calendar-ok">
-      📅 Connected to Google Calendar ({status.calendarId}). Slots that clash with your events are unavailable to guests.
-    </p>
+    <>
+      <p className="small hero-note calendar-ok">
+        📅 Connected to Google Calendar ({status.calendarId}). Slots that clash with your events are unavailable to
+        guests{status.writeOk ? ', and new bookings are added to your calendar.' : '.'}
+      </p>
+      {status.writeOk === false && (
+        <p className="small hero-note calendar-error" role="alert">
+          ⚠️ Bookings aren't being added to your calendar yet: {status.writeError}
+        </p>
+      )}
+    </>
   );
 }

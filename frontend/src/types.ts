@@ -41,6 +41,8 @@ export interface CalendarStatus {
   calendarId: string | null;
   error: string | null;
   checkedAt: string | null;
+  writeOk: boolean | null;
+  writeError: string | null;
 }
 
 export interface NewSlotsInput {

@@ -26,6 +26,9 @@ The optional Google Calendar extra:
 - The API asks the **Google Calendar free/busy API** which times the host is busy, then marks any slot that
   overlaps an event as **Unavailable** for guests and **Calendar clash** on the host dashboard. Booking a
   clashing slot is also refused server-side. Only busy *times* are read, never event titles or details.
+- Every booking is also **added to the host's calendar** ("LiftHours: name", with email and topic), and removed
+  if the host cancels it. The event ID is derived from the booking ID, so retries never create duplicates, and
+  bookings that couldn't be added (e.g. before write access was granted) are retried every 2 minutes.
 
 The optional AI extra:
 
@@ -82,7 +85,8 @@ validation, overlap rules, the host view, and fires 8 simultaneous bookings at o
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project and **enable the Google Calendar API**.
 2. **IAM & Admin → Service accounts → Create** (no roles needed), then **Keys → Add key → JSON**.
 3. In Google Calendar, go to **Settings → your calendar → Share with specific people**, add the service account's
-   email and choose **See only free/busy**.
+   email and choose **Make changes to events** (or **See only free/busy** if you only want clash detection and
+   don't want bookings added to your calendar).
 4. Set `GOOGLE_CALENDAR_ID` (your Gmail address for your main calendar) and `GOOGLE_SERVICE_ACCOUNT_KEY` (the JSON
    key's contents) on the API. The host dashboard shows whether the connection works.
 
@@ -155,7 +159,7 @@ keeping the AI call separate from booking, and the PGlite fallback for zero-setu
 
 - **Host authentication** (even a simple magic link). Right now `/host` is open, as the brief allowed.
 - **Email confirmations** to the guest and host (e.g. Resend), plus a cancel/reschedule link for guests.
-- **Create calendar events** for new bookings (needs write access), not just reading busy times.
+- **Email the guest a calendar invite.** A service account can't invite attendees on a personal Gmail calendar, so this needs OAuth or an email provider.
 - **Recurring availability** ("every Tuesday 2–4 pm") instead of one-off blocks.
 - **Real migrations** (e.g. Drizzle/Prisma) instead of an idempotent boot-time schema, plus Jest/Playwright tests in CI.
 - **Rate limiting** on the booking and AI endpoints.

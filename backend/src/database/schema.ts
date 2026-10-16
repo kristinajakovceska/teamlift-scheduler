@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Whether the booking has been added to the host's Google Calendar (retried until true).
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS calendar_synced BOOLEAN NOT NULL DEFAULT false;
+
 -- Supabase exposes the public schema through its Data API. With RLS on and no policies,
 -- that API can read nothing; this server connects as the table owner, which bypasses RLS.
 ALTER TABLE slots ENABLE ROW LEVEL SECURITY;

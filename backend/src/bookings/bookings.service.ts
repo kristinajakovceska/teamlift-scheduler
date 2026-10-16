@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { AiService } from '../ai/ai.service';
 import { GoogleCalendarService, overlapsBusy } from '../calendar/google-calendar.service';
 import { config } from '../config';
@@ -6,6 +13,7 @@ import { DatabaseService } from '../database/database.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 const UNIQUE_VIOLATION = '23505';
+const CALENDAR_SYNC_MS = 2 * 60_000;
 
 export interface BookingResult {
   id: string;
@@ -18,7 +26,9 @@ export interface BookingResult {
 }
 
 @Injectable()
-export class BookingsService {
+export class BookingsService implements OnApplicationBootstrap, OnModuleDestroy {
+  private syncTimer?: NodeJS.Timeout;
+
   constructor(
     private readonly db: DatabaseService,
     private readonly ai: AiService,
@@ -49,7 +59,7 @@ export class BookingsService {
         `INSERT INTO bookings (slot_id, name, email, topic) VALUES ($1, $2, $3, $4) RETURNING id`,
         [slotId, dto.name, dto.email, dto.topic || null],
       );
-      return {
+      const result: BookingResult = {
         id: booking.id,
         slotId,
         startsAt: slot.startsAt,
@@ -58,6 +68,9 @@ export class BookingsService {
         email: dto.email,
         topic: dto.topic || null,
       };
+      // Add it to the host's Google Calendar in the background; the guest never waits on Google.
+      void this.addToCalendar(result);
+      return result;
     } catch (err) {
       if ((err as { code?: string }).code === UNIQUE_VIOLATION) {
         throw new ConflictException('Sorry, someone just booked this slot. Please pick another one.');
@@ -96,5 +109,41 @@ export class BookingsService {
     }
     return result;
   }
-}
 
+  onApplicationBootstrap() {
+    if (!this.calendar.enabled) return;
+    void this.syncCalendar();
+    this.syncTimer = setInterval(() => void this.syncCalendar(), CALENDAR_SYNC_MS);
+    this.syncTimer.unref();
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.syncTimer);
+  }
+
+  /**
+   * Retries upcoming bookings that aren't in Google Calendar yet, e.g. ones made before
+   * write access was granted or while Google was unreachable.
+   */
+  async syncCalendar(): Promise<void> {
+    const pending = await this.db.query<BookingResult>(
+      `SELECT b.id, b.slot_id AS "slotId", b.name, b.email, b.topic,
+              to_char(s.starts_at, 'YYYY-MM-DD"T"HH24:MI') AS "startsAt",
+              s.duration_minutes AS "durationMinutes"
+       FROM bookings b JOIN slots s ON s.id = b.slot_id
+       WHERE NOT b.calendar_synced
+         AND s.starts_at + make_interval(mins => s.duration_minutes) > (now() AT TIME ZONE $1)
+       ORDER BY s.starts_at LIMIT 50`,
+      [config.timezone],
+    );
+    for (const booking of pending) {
+      if (!(await this.addToCalendar(booking))) break; // calendar not writable yet; try again later
+    }
+  }
+
+  private async addToCalendar(booking: BookingResult): Promise<boolean> {
+    const added = await this.calendar.addBookingEvent(booking);
+    if (added) await this.db.query('UPDATE bookings SET calendar_synced = true WHERE id = $1', [booking.id]);
+    return added;
+  }
+}

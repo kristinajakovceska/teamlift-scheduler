@@ -116,7 +116,10 @@ export class SlotsService {
 
   /** Removes a slot (and its booking, if any — the host is cancelling it). */
   async remove(id: number): Promise<void> {
+    // Grab the booking (if any) first: the cascade delete removes it along with the slot.
+    const [booking] = await this.db.query<{ id: string }>('SELECT id FROM bookings WHERE slot_id = $1', [id]);
     const deleted = await this.db.query('DELETE FROM slots WHERE id = $1 RETURNING id', [id]);
     if (!deleted.length) throw new NotFoundException('Slot not found.');
+    if (booking) await this.calendar.removeBookingEvent(booking.id);
   }
 }
