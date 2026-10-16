@@ -53,7 +53,7 @@ export class AiService {
           ...(lowThinking && { thinkingConfig: { thinkingLevel: 'low' } }),
         },
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
