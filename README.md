@@ -4,7 +4,9 @@ A small booking app for the TeamLift internship challenge. A coach publishes 1:1
 slots, and AI champions book one with their name, email and what they want to cover.
 After booking, Gemini writes them a short, personalised confirmation.
 
-**Live app:** _add link after deploying_ · **Video:** _optional_
+**Live app:** https://lifthours.onrender.com (host dashboard: https://lifthours.onrender.com/#/host) · **Video:** _optional_
+
+> Hosted on Render's free plan, so the first visit after a quiet spell can take about 50 s to wake up. Data lives in Supabase Postgres.
 
 | Guest: book a session | Host: publish & manage |
 | --- | --- |
