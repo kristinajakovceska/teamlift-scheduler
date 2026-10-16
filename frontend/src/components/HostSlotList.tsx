@@ -58,7 +58,11 @@ function HostSlotRow({ slot, onChanged }: { slot: HostSlot; onChanged: () => voi
     <li className={`host-slot${slot.booking ? ' is-booked' : ''}`}>
       <div className="host-slot-main">
         <span className="host-slot-time">{formatRange(slot.startsAt, slot.durationMinutes)}</span>
-        <span className={`pill ${slot.booking ? 'pill-booked' : 'pill-open'}`}>{slot.booking ? 'Booked' : 'Open'}</span>
+        {slot.booking ? (
+          <span className="pill pill-booked">Booked</span>
+        ) : (
+          !slot.calendarBusy && <span className="pill pill-open">Open</span>
+        )}
         {slot.calendarBusy && (
           <span className="pill pill-clash" title="You have an event in Google Calendar at this time, so guests can't book it.">
             Calendar clash

@@ -13,6 +13,7 @@ export function HostPage({ config }: { config: AppConfig }) {
 
   const booked = slots?.filter((s) => s.booking).length ?? 0;
   const total = slots?.length ?? 0;
+  const open = slots?.filter((s) => !s.booking && !s.calendarBusy).length ?? 0;
 
   async function copyLink() {
     await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/`);
@@ -43,7 +44,7 @@ export function HostPage({ config }: { config: AppConfig }) {
         <div className="stats">
           <Stat label="Upcoming slots" value={total} />
           <Stat label="Booked" value={booked} />
-          <Stat label="Still open" value={total - booked} />
+          <Stat label="Still open" value={open} />
         </div>
       )}
 
