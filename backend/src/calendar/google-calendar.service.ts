@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createSign } from 'node:crypto';
 import { config } from '../config';
+import { GoogleOAuthService } from './google-oauth.service';
 
 export interface BusyInterval {
   start: number; // epoch ms
@@ -64,6 +65,8 @@ export class GoogleCalendarService {
     writeError: null,
   };
 
+  constructor(private readonly oauth: GoogleOAuthService) {}
+
   get enabled(): boolean {
     return Boolean(this.key && config.googleCalendarId);
   }
@@ -126,27 +129,41 @@ export class GoogleCalendarService {
   /**
    * Adds a booking to the host's calendar. The event ID is derived from the booking UUID,
    * so retries and concurrent syncs can never create duplicates (Google answers 409).
+   *
+   * With `inviteGuest` and the host's Google account connected, the event is created *as the
+   * host* with the guest as an attendee, and Google emails them an invite. Otherwise it's
+   * created by the service account without attendees (Google doesn't allow a service account
+   * to invite people on a personal Gmail calendar).
    * Returns false if the calendar isn't writable yet; never throws.
    */
-  async addBookingEvent(b: CalendarBooking): Promise<boolean> {
+  async addBookingEvent(b: CalendarBooking, inviteGuest = false): Promise<boolean> {
     if (!this.enabled) return false;
     const end = addMinutesToWallClock(b.startsAt, b.durationMinutes);
     try {
-      const res = await this.calendarRequest('POST', `/calendars/${encodeURIComponent(config.googleCalendarId!)}/events`, {
-        id: eventId(b.id),
-        summary: `LiftHours: ${b.name}`,
-        description: [`Booked via LiftHours`, `Name: ${b.name}`, `Email: ${b.email}`, b.topic ? `Topic: ${b.topic}` : null]
-          .filter(Boolean)
-          .join('\n'),
-        start: { dateTime: `${b.startsAt}:00`, timeZone: config.timezone },
-        end: { dateTime: `${end}:00`, timeZone: config.timezone },
-        // Google won't let a service account invite attendees on a personal Gmail calendar,
-        // so the guest is listed in the description and gets the .ics from the booking page.
-      });
+      const hostToken = inviteGuest ? await this.oauth.accessToken().catch(() => null) : null;
+      const res = await this.calendarRequest(
+        'POST',
+        `/calendars/${encodeURIComponent(config.googleCalendarId!)}/events${hostToken ? '?sendUpdates=all' : ''}`,
+        {
+          id: eventId(b.id),
+          summary: `LiftHours: ${b.name}`,
+          description: [`Booked via LiftHours`, `Name: ${b.name}`, `Email: ${b.email}`, b.topic ? `Topic: ${b.topic}` : null]
+            .filter(Boolean)
+            .join('\n'),
+          start: { dateTime: `${b.startsAt}:00`, timeZone: config.timezone },
+          end: { dateTime: `${end}:00`, timeZone: config.timezone },
+          ...(hostToken && {
+            attendees: [{ email: b.email, displayName: b.name }],
+            guestsCanModify: false,
+            guestsCanInviteOthers: false,
+          }),
+        },
+        hostToken ?? undefined,
+      );
       if (!res.ok && res.status !== 409) {
         const body = await res.text();
         throw new Error(
-          res.status === 403
+          res.status === 403 && !hostToken
             ? `No write access. Share the calendar with ${this.key!.client_email} as "Make changes to events".`
             : `Google Calendar HTTP ${res.status}: ${body.slice(0, 200)}`,
         );
@@ -161,13 +178,19 @@ export class GoogleCalendarService {
     }
   }
 
-  /** Removes a booking's event (when the host cancels). Best effort: a missing event is fine. */
+  /**
+   * Removes a booking's event (when the host cancels). Acts as the host when connected, so a
+   * guest who was invited gets Google's cancellation email. Best effort: a missing event is fine.
+   */
   async removeBookingEvent(bookingId: string): Promise<void> {
     if (!this.enabled) return;
     try {
+      const hostToken = await this.oauth.accessToken().catch(() => null);
       const res = await this.calendarRequest(
         'DELETE',
-        `/calendars/${encodeURIComponent(config.googleCalendarId!)}/events/${eventId(bookingId)}`,
+        `/calendars/${encodeURIComponent(config.googleCalendarId!)}/events/${eventId(bookingId)}${hostToken ? '?sendUpdates=all' : ''}`,
+        undefined,
+        hostToken ?? undefined,
       );
       if (!res.ok && res.status !== 404 && res.status !== 410) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
@@ -175,10 +198,11 @@ export class GoogleCalendarService {
     }
   }
 
-  private async calendarRequest(method: string, path: string, body?: unknown): Promise<Response> {
+  /** Calls the Calendar API as the service account, or as the host when `token` is given. */
+  private async calendarRequest(method: string, path: string, body?: unknown, token?: string): Promise<Response> {
     return fetch(CALENDAR_API + path, {
       method,
-      headers: { Authorization: `Bearer ${await this.accessToken()}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token ?? (await this.accessToken())}`, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(8_000),
     });

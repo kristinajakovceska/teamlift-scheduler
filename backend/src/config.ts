@@ -11,6 +11,11 @@ export const config = {
   // Google Calendar clash detection (optional). The key is a service-account JSON key, raw or base64.
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID || undefined,
   googleServiceAccountKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || undefined,
+  // Optional "Connect Google" OAuth client, so events are created as the host and guests get invites.
+  googleOauthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || undefined,
+  googleOauthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || undefined,
+  // Public base URL for OAuth redirects. Render sets RENDER_EXTERNAL_URL automatically.
+  publicUrl: (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT ?? 3000}`).replace(/\/$/, ''),
   seedDemo: process.env.SEED_DEMO !== 'false',
   // Built frontend to serve alongside the API (only present after `npm run build` in frontend/).
   staticDir: process.env.STATIC_DIR ?? '../frontend/dist',

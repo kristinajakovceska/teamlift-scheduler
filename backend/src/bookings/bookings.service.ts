@@ -56,7 +56,7 @@ export class BookingsService implements OnApplicationBootstrap, OnModuleDestroy 
     // check, so two people clicking at the same moment can never both get the slot.
     try {
       const [booking] = await this.db.query<{ id: string }>(
-        `INSERT INTO bookings (slot_id, name, email, topic) VALUES ($1, $2, $3, $4) RETURNING id`,
+        `INSERT INTO bookings (slot_id, name, email, topic, invite_guest) VALUES ($1, $2, $3, $4, true) RETURNING id`,
         [slotId, dto.name, dto.email, dto.topic || null],
       );
       const result: BookingResult = {
@@ -69,7 +69,7 @@ export class BookingsService implements OnApplicationBootstrap, OnModuleDestroy 
         topic: dto.topic || null,
       };
       // Add it to the host's Google Calendar in the background; the guest never waits on Google.
-      void this.addToCalendar(result);
+      void this.addToCalendar(result, true);
       return result;
     } catch (err) {
       if ((err as { code?: string }).code === UNIQUE_VIOLATION) {
@@ -126,8 +126,8 @@ export class BookingsService implements OnApplicationBootstrap, OnModuleDestroy 
    * write access was granted or while Google was unreachable.
    */
   async syncCalendar(): Promise<void> {
-    const pending = await this.db.query<BookingResult>(
-      `SELECT b.id, b.slot_id AS "slotId", b.name, b.email, b.topic,
+    const pending = await this.db.query<BookingResult & { inviteGuest: boolean }>(
+      `SELECT b.id, b.slot_id AS "slotId", b.name, b.email, b.topic, b.invite_guest AS "inviteGuest",
               to_char(s.starts_at, 'YYYY-MM-DD"T"HH24:MI') AS "startsAt",
               s.duration_minutes AS "durationMinutes"
        FROM bookings b JOIN slots s ON s.id = b.slot_id
@@ -137,12 +137,12 @@ export class BookingsService implements OnApplicationBootstrap, OnModuleDestroy 
       [config.timezone],
     );
     for (const booking of pending) {
-      if (!(await this.addToCalendar(booking))) break; // calendar not writable yet; try again later
+      if (!(await this.addToCalendar(booking, booking.inviteGuest))) break; // calendar not writable yet; try again later
     }
   }
 
-  private async addToCalendar(booking: BookingResult): Promise<boolean> {
-    const added = await this.calendar.addBookingEvent(booking);
+  private async addToCalendar(booking: BookingResult, inviteGuest: boolean): Promise<boolean> {
+    const added = await this.calendar.addBookingEvent(booking, inviteGuest);
     if (added) await this.db.query('UPDATE bookings SET calendar_synced = true WHERE id = $1', [booking.id]);
     return added;
   }

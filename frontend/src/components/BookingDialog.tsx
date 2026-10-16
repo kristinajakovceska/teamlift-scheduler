@@ -142,6 +142,7 @@ function Confirmation({ booking, config, onClose }: { booking: Booking; config: 
       <h2>You're booked!</h2>
       <p className="muted">
         We've reserved this slot for <strong>{booking.email}</strong>.
+        {config.guestInvites && ' A Google Calendar invite is on its way to your inbox.'}
       </p>
 
       <div className={`ai-message${message ? '' : ' loading'}`} aria-live="polite">

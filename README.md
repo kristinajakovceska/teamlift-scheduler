@@ -29,6 +29,12 @@ The optional Google Calendar extra:
 - Every booking is also **added to the host's calendar** ("LiftHours: name", with email and topic), and removed
   if the host cancels it. The event ID is derived from the booking ID, so retries never create duplicates, and
   bookings that couldn't be added (e.g. before write access was granted) are retried every 2 minutes.
+- **Guests get a real Google Calendar invite.** A service account can't invite attendees on a personal Gmail
+  calendar, so the host clicks **Connect Google** once on the dashboard (OAuth, offline access). New bookings
+  are then created *as the host* with the guest as an attendee and `sendUpdates=all`, so Google emails the
+  invite and RSVPs show up on the host's event. Cancelling sends the guest Google's cancellation. Only the
+  account that owns `GOOGLE_CALENDAR_ID` can connect (the host page has no login), the OAuth `state` is
+  HMAC-signed, and bookings made before invites existed never get one (`invite_guest` column).
 
 The optional AI extra:
 
@@ -87,7 +93,11 @@ validation, overlap rules, the host view, and fires 8 simultaneous bookings at o
 3. In Google Calendar, go to **Settings → your calendar → Share with specific people**, add the service account's
    email and choose **Make changes to events** (or **See only free/busy** if you only want clash detection and
    don't want bookings added to your calendar).
-4. Set `GOOGLE_CALENDAR_ID` (your Gmail address for your main calendar) and `GOOGLE_SERVICE_ACCOUNT_KEY` (the JSON
+4. Optional, for guest invites: **Google Auth Platform → Clients → Create client → Web application**, with
+   authorised redirect URI `https://<your-app>/api/host/google/callback`. Set `GOOGLE_OAUTH_CLIENT_ID` and
+   `GOOGLE_OAUTH_CLIENT_SECRET`, publish the app (Audience → In production), then click **Connect Google**
+   on the host dashboard.
+5. Set `GOOGLE_CALENDAR_ID` (your Gmail address for your main calendar) and `GOOGLE_SERVICE_ACCOUNT_KEY` (the JSON
    key's contents) on the API. The host dashboard shows whether the connection works.
 
 The server signs its own service-account JWT with `node:crypto`, so there's no `googleapis` dependency. Results are cached
@@ -159,7 +169,7 @@ keeping the AI call separate from booking, and the PGlite fallback for zero-setu
 
 - **Host authentication** (even a simple magic link). Right now `/host` is open, as the brief allowed.
 - **Email confirmations** to the guest and host (e.g. Resend), plus a cancel/reschedule link for guests.
-- **Email the guest a calendar invite.** A service account can't invite attendees on a personal Gmail calendar, so this needs OAuth or an email provider.
+- **Let guests reschedule or cancel** from a link in their invite, instead of only the host being able to cancel.
 - **Recurring availability** ("every Tuesday 2–4 pm") instead of one-off blocks.
 - **Real migrations** (e.g. Drizzle/Prisma) instead of an idempotent boot-time schema, plus Jest/Playwright tests in CI.
 - **Rate limiting** on the booking and AI endpoints.

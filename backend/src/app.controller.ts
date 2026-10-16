@@ -1,10 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
+import { GoogleOAuthService } from './calendar/google-oauth.service';
 import { config } from './config';
 import { DatabaseService } from './database/database.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly oauth: GoogleOAuthService,
+  ) {}
 
   @Get('health')
   async health() {
@@ -14,12 +18,13 @@ export class AppController {
 
   // Public settings the frontend needs to render correctly.
   @Get('config')
-  getConfig() {
+  async getConfig() {
     return {
       hostName: config.hostName,
       timezone: config.timezone,
       aiEnabled: Boolean(config.geminiApiKey),
       calendarEnabled: Boolean(config.googleCalendarId && config.googleServiceAccountKey),
+      guestInvites: Boolean(await this.oauth.connectedEmail()),
     };
   }
 }

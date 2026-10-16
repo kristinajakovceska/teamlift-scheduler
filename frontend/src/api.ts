@@ -44,4 +44,6 @@ export const api = {
   createSlots: (input: NewSlotsInput) => request<Slot[]>('/host/slots', 'POST', input),
   deleteSlot: (id: number) => request<void>(`/host/slots/${id}`, 'DELETE'),
   calendarStatus: () => request<CalendarStatus>('/host/calendar'),
+  /** Full-page redirect target for the host's one-time Google consent. */
+  googleConnectUrl: `${BASE}/host/google/connect`,
 };

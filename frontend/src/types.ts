@@ -33,6 +33,8 @@ export interface AppConfig {
   timezone: string;
   aiEnabled: boolean;
   calendarEnabled: boolean;
+  /** New bookings get a Google Calendar invite by email. */
+  guestInvites: boolean;
 }
 
 export interface CalendarStatus {
@@ -43,6 +45,7 @@ export interface CalendarStatus {
   checkedAt: string | null;
   writeOk: boolean | null;
   writeError: string | null;
+  invites: { available: boolean; connectedAs: string | null };
 }
 
 export interface NewSlotsInput {

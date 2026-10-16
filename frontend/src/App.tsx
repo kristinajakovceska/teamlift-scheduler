@@ -8,7 +8,7 @@ type Route = 'book' | 'host';
 
 const readRoute = (): Route => (window.location.hash === '#/host' ? 'host' : 'book');
 
-const FALLBACK_CONFIG: AppConfig = { hostName: 'your coach', timezone: 'Europe/London', aiEnabled: false, calendarEnabled: false };
+const FALLBACK_CONFIG: AppConfig = { hostName: 'your coach', timezone: 'Europe/London', aiEnabled: false, calendarEnabled: false, guestInvites: false };
 
 export function App() {
   const [route, setRoute] = useState<Route>(readRoute);

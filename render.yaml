@@ -21,6 +21,10 @@ services:
         sync: false # optional, the host's calendar, e.g. their Gmail address
       - key: GOOGLE_SERVICE_ACCOUNT_KEY
         sync: false # optional, service-account JSON key (see README → Google Calendar)
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false # optional, OAuth client so the host can "Connect Google" and guests get invites
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
       - key: APP_TIMEZONE
         value: Europe/London
       - key: HOST_NAME
