@@ -29,7 +29,7 @@ The optional Google Calendar extra:
 
 The optional AI extra:
 
-- `POST /api/bookings/:id/confirmation-message` calls **Gemini 2.5 Flash** (free tier) to write a warm confirmation that mentions the guest's topic. If no key is set, or the call fails, it falls back to a template, so booking never breaks.
+- `POST /api/bookings/:id/confirmation-message` calls **Gemini 3.8 Flash** (free tier) to write a warm confirmation that mentions the guest's topic. If no key is set, or the call fails, it falls back to a template, so booking never breaks.
 
 What I added myself:
 
@@ -149,7 +149,7 @@ I built this with **Claude Code** (Anthropic's agentic coding CLI). I used it to
 projects, write the SQL and components, run the smoke tests, and click through the UI in a real browser to check the
 flow end to end. I reviewed the decisions: DB-level uniqueness for double bookings, wall-clock time handling,
 keeping the AI call separate from booking, and the PGlite fallback for zero-setup local runs. The app itself uses
-**Gemini 2.5 Flash** via Google AI Studio's free tier.
+**Gemini 3.8 Flash** via Google AI Studio's free tier.
 
 ## What I'd improve with more time
 

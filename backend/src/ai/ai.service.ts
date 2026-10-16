@@ -36,14 +36,10 @@ export class AiService {
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.geminiApiKey! },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 400,
-          // Short replies don't need "thinking"; turning it off keeps latency low.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
+        // Generous token cap: on Gemini 3 models any internal "thinking" counts toward it.
+        generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
       }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
