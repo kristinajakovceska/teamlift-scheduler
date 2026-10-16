@@ -30,21 +30,44 @@ export class AiService {
   }
 
   private async generate(prompt: string): Promise<string> {
+    try {
+      return await this.callGemini(prompt, true);
+    } catch (err) {
+      // Older/other models may not accept thinkingLevel; retry once without it.
+      if ((err as Error).message.startsWith('HTTP 400')) return this.callGemini(prompt, false);
+      throw err;
+    }
+  }
+
+  private async callGemini(prompt: string, lowThinking: boolean): Promise<string> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.geminiModel}:generateContent`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.geminiApiKey! },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        // Generous token cap: on Gemini 3 models any internal "thinking" counts toward it.
-        generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
+        generationConfig: {
+          temperature: 0.8,
+          // Thinking tokens count toward this cap on Gemini 3, so keep headroom and thinking low.
+          maxOutputTokens: 2048,
+          ...(lowThinking && { thinkingConfig: { thinkingLevel: 'low' } }),
+        },
       }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 
-    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('').trim();
+    const data = (await res.json()) as {
+      candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+    };
+    const candidate = data.candidates?.[0];
+    // A reply cut off mid-sentence is worse than the template, so treat it as a failure.
+    if (candidate?.finishReason === 'MAX_TOKENS') throw new Error('Response truncated (MAX_TOKENS)');
+    const text = candidate?.content?.parts
+      ?.filter((p) => !p.thought)
+      .map((p) => p.text ?? '')
+      .join('')
+      .trim();
     if (!text) throw new Error('Empty response');
     return text;
   }
@@ -60,6 +83,7 @@ function buildPrompt(b: BookingDetails): string {
     b.topic
       ? `They want to talk about: "${b.topic}". Reference it naturally and suggest one small thing they could bring or think about beforehand.`
       : `They didn't share a topic, so gently invite them to think about one AI use case from their week.`,
+    `Refer to the coach by name and don't assume their gender (no he/she).`,
     `Plain text only, no markdown, no subject line, no sign-off placeholders like [Name].`,
   ].join(' ');
 }
