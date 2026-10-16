@@ -105,12 +105,15 @@ export class SlotsService {
     );
   }
 
-  /** Marks slots that overlap a busy time in the host's Google Calendar. */
-  private async withCalendar<T extends { startMs: number; durationMinutes: number }>(rows: T[]) {
+  /**
+   * Marks open slots that overlap a busy time in the host's Google Calendar. Booked slots are
+   * skipped: their own "LiftHours: name" event makes them look busy, but they're already taken.
+   */
+  private async withCalendar<T extends { startMs: number; durationMinutes: number; isBooked: boolean }>(rows: T[]) {
     const busy = await this.calendar.busyIntervals();
     return rows.map(({ startMs, ...slot }) => ({
       ...slot,
-      calendarBusy: overlapsBusy(startMs, startMs + slot.durationMinutes * 60_000, busy),
+      calendarBusy: !slot.isBooked && overlapsBusy(startMs, startMs + slot.durationMinutes * 60_000, busy),
     }));
   }
 
