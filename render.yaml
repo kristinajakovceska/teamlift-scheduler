@@ -1,0 +1,38 @@
+# One-click deploy on Render: Dashboard → New → Blueprint → pick this repo.
+# Creates a free Postgres database, the NestJS API, and the static React site.
+databases:
+  - name: lifthours-db
+    plan: free
+
+services:
+  - type: web
+    name: lifthours-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lifthours-db
+          property: connectionString
+      - key: APP_TIMEZONE
+        value: Europe/London
+      - key: HOST_NAME
+        value: Alex, AI Coach
+      - key: GEMINI_API_KEY
+        sync: false # set this in the Render dashboard
+      - key: CORS_ORIGIN
+        sync: false # e.g. https://lifthours-web.onrender.com
+
+  - type: web
+    name: lifthours-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false # e.g. https://lifthours-api.onrender.com
