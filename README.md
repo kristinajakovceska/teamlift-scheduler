@@ -21,6 +21,12 @@ The brief's requirements:
 - **Book a slot** with name and email.
 - **No double bookings.** A booked slot shows as taken, and the database refuses a second booking even if two people click at the same moment.
 
+The optional Google Calendar extra:
+
+- The API asks the **Google Calendar free/busy API** which times the host is busy, then marks any slot that
+  overlaps an event as **Unavailable** for guests and **Calendar clash** on the host dashboard. Booking a
+  clashing slot is also refused server-side. Only busy *times* are read, never event titles or details.
+
 The optional AI extra:
 
 - `POST /api/bookings/:id/confirmation-message` calls **Gemini 2.5 Flash** (free tier) to write a warm confirmation that mentions the guest's topic. If no key is set, or the call fails, it falls back to a template, so booking never breaks.
@@ -70,6 +76,18 @@ Tables are created automatically on startup.
 
 **Smoke test** (with the API running): `cd backend && npm run smoke`. This checks creating, listing, booking,
 validation, overlap rules, the host view, and fires 8 simultaneous bookings at one slot to check that exactly one wins.
+
+## Google Calendar setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project and **enable the Google Calendar API**.
+2. **IAM & Admin → Service accounts → Create** (no roles needed), then **Keys → Add key → JSON**.
+3. In Google Calendar, go to **Settings → your calendar → Share with specific people**, add the service account's
+   email and choose **See only free/busy**.
+4. Set `GOOGLE_CALENDAR_ID` (your Gmail address for your main calendar) and `GOOGLE_SERVICE_ACCOUNT_KEY` (the JSON
+   key's contents) on the API. The host dashboard shows whether the connection works.
+
+The server signs its own service-account JWT with `node:crypto`, so there's no `googleapis` dependency. Results are cached
+for 60 s. If Google is unreachable, the check fails open: slots stay bookable and the dashboard shows the error.
 
 ## Deploying
 
@@ -137,7 +155,7 @@ keeping the AI call separate from booking, and the PGlite fallback for zero-setu
 
 - **Host authentication** (even a simple magic link). Right now `/host` is open, as the brief allowed.
 - **Email confirmations** to the guest and host (e.g. Resend), plus a cancel/reschedule link for guests.
-- **Google Calendar sync** to hide slots that clash with the host's real events.
+- **Create calendar events** for new bookings (needs write access), not just reading busy times.
 - **Recurring availability** ("every Tuesday 2–4 pm") instead of one-off blocks.
 - **Real migrations** (e.g. Drizzle/Prisma) instead of an idempotent boot-time schema, plus Jest/Playwright tests in CI.
 - **Rate limiting** on the booking and AI endpoints.

@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AiService } from '../ai/ai.service';
+import { GoogleCalendarService, overlapsBusy } from '../calendar/google-calendar.service';
 import { config } from '../config';
 import { DatabaseService } from '../database/database.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -21,18 +22,25 @@ export class BookingsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly ai: AiService,
+    private readonly calendar: GoogleCalendarService,
   ) {}
 
   async book(slotId: number, dto: CreateBookingDto): Promise<BookingResult> {
-    const [slot] = await this.db.query<{ startsAt: string; durationMinutes: number; isPast: boolean }>(
+    const [slot] = await this.db.query<{ startsAt: string; durationMinutes: number; isPast: boolean; startMs: number }>(
       `SELECT to_char(starts_at, 'YYYY-MM-DD"T"HH24:MI') AS "startsAt",
               duration_minutes AS "durationMinutes",
+              (extract(epoch FROM starts_at AT TIME ZONE $2) * 1000)::float8 AS "startMs",
               starts_at <= (now() AT TIME ZONE $2) AS "isPast"
        FROM slots WHERE id = $1`,
       [slotId, config.timezone],
     );
     if (!slot) throw new NotFoundException('This slot no longer exists.');
     if (slot.isPast) throw new BadRequestException('This slot has already started.');
+
+    const busy = await this.calendar.busyIntervals();
+    if (overlapsBusy(slot.startMs, slot.startMs + slot.durationMinutes * 60_000, busy)) {
+      throw new ConflictException('Sorry, this time is no longer available. Please pick another one.');
+    }
 
     // No "check then insert": the UNIQUE(slot_id) constraint makes the insert itself the
     // check, so two people clicking at the same moment can never both get the slot.

@@ -19,6 +19,7 @@ export class AppController {
       hostName: config.hostName,
       timezone: config.timezone,
       aiEnabled: Boolean(config.geminiApiKey),
+      calendarEnabled: Boolean(config.googleCalendarId && config.googleServiceAccountKey),
     };
   }
 }

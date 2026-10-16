@@ -12,12 +12,12 @@ export function BookingPage({ config }: { config: AppConfig }) {
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
 
   const days = useMemo(() => groupByDay(slots ?? []), [slots]);
-  const freeCount = slots?.filter((s) => !s.isBooked).length ?? 0;
+  const freeCount = slots?.filter(isOpen).length ?? 0;
 
   // Default to the first day that still has something free.
   const selectedDay =
     (pickedDay && days.some(([key]) => key === pickedDay) ? pickedDay : null) ??
-    days.find(([, daySlots]) => daySlots.some((s) => !s.isBooked))?.[0] ??
+    days.find(([, daySlots]) => daySlots.some(isOpen))?.[0] ??
     days[0]?.[0];
   const daySlots = days.find(([key]) => key === selectedDay)?.[1] ?? [];
 
@@ -59,7 +59,7 @@ export function BookingPage({ config }: { config: AppConfig }) {
           <h2 className="card-title">1. Pick a day</h2>
           <div className="day-strip" role="tablist" aria-label="Days with office hours">
             {days.map(([key, list]) => {
-              const free = list.filter((s) => !s.isBooked).length;
+              const free = list.filter(isOpen).length;
               const date = parseStartsAt(`${key}T00:00`);
               return (
                 <button
@@ -84,13 +84,13 @@ export function BookingPage({ config }: { config: AppConfig }) {
             {daySlots.map((slot) => (
               <li key={slot.id}>
                 <button
-                  className={`slot${slot.isBooked ? ' booked' : ''}`}
-                  disabled={slot.isBooked}
+                  className={`slot${isOpen(slot) ? '' : ' booked'}`}
+                  disabled={!isOpen(slot)}
                   onClick={() => setActiveSlot(slot)}
-                  aria-label={`${formatTime(parseStartsAt(slot.startsAt))}, ${formatDuration(slot.durationMinutes)}${slot.isBooked ? ', already booked' : ''}`}
+                  aria-label={`${formatTime(parseStartsAt(slot.startsAt))}, ${formatDuration(slot.durationMinutes)}${isOpen(slot) ? '' : ', not available'}`}
                 >
                   <span className="slot-time">{formatTime(parseStartsAt(slot.startsAt))}</span>
-                  <span className="slot-meta">{slot.isBooked ? 'Booked' : formatDuration(slot.durationMinutes)}</span>
+                  <span className="slot-meta">{slotLabel(slot)}</span>
                 </button>
               </li>
             ))}
@@ -110,4 +110,13 @@ export function BookingPage({ config }: { config: AppConfig }) {
       )}
     </>
   );
+}
+
+const isOpen = (slot: Slot) => !slot.isBooked && !slot.calendarBusy;
+
+function slotLabel(slot: Slot): string {
+  if (slot.isBooked) return 'Booked';
+  // Guests only learn the host is unavailable, never anything about their calendar.
+  if (slot.calendarBusy) return 'Unavailable';
+  return formatDuration(slot.durationMinutes);
 }

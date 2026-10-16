@@ -8,6 +8,9 @@ export const config = {
   hostName: process.env.HOST_NAME ?? 'Alex, AI Coach',
   geminiApiKey: process.env.GEMINI_API_KEY || undefined,
   geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+  // Google Calendar clash detection (optional). The key is a service-account JSON key, raw or base64.
+  googleCalendarId: process.env.GOOGLE_CALENDAR_ID || undefined,
+  googleServiceAccountKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || undefined,
   seedDemo: process.env.SEED_DEMO !== 'false',
   // Built frontend to serve alongside the API (only present after `npm run build` in frontend/).
   staticDir: process.env.STATIC_DIR ?? '../frontend/dist',

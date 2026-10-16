@@ -4,6 +4,8 @@ export interface PublicSlot {
   startsAt: string; // "YYYY-MM-DDTHH:MM" in the host time zone
   durationMinutes: number;
   isBooked: boolean;
+  /** The host is busy in Google Calendar at this time, so it can't be booked. */
+  calendarBusy: boolean;
 }
 
 /** What the host sees in their dashboard. */

@@ -1,4 +1,4 @@
-import type { AppConfig, Booking, HostSlot, NewSlotsInput, Slot } from './types';
+import type { AppConfig, Booking, CalendarStatus, HostSlot, NewSlotsInput, Slot } from './types';
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api`;
 
@@ -43,4 +43,5 @@ export const api = {
   hostSlots: () => request<HostSlot[]>('/host/slots'),
   createSlots: (input: NewSlotsInput) => request<Slot[]>('/host/slots', 'POST', input),
   deleteSlot: (id: number) => request<void>(`/host/slots/${id}`, 'DELETE'),
+  calendarStatus: () => request<CalendarStatus>('/host/calendar'),
 };

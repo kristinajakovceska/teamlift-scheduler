@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { AppConfig } from '../types';
 import { usePolling } from '../usePolling';
 import { ErrorCard, SkeletonCard } from './StatusCards';
+import { CalendarStatusNote } from './CalendarStatusNote';
 import { CreateSlotsForm } from './CreateSlotsForm';
 import { HostSlotList } from './HostSlotList';
 
@@ -31,6 +32,7 @@ export function HostPage({ config }: { config: AppConfig }) {
               ? '✨ Guests get a personalised confirmation written by Gemini.'
               : 'AI confirmations are off. Add GEMINI_API_KEY to the API to turn them on.'}
           </p>
+          <CalendarStatusNote />
         </div>
         <button className="btn btn-ghost" onClick={copyLink}>
           {copied ? '✓ Link copied' : 'Copy booking link'}

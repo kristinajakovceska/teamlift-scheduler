@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { GoogleCalendarService, overlapsBusy } from '../calendar/google-calendar.service';
 import { config } from '../config';
 import { DatabaseService } from '../database/database.service';
 import { CreateSlotDto } from './dto/create-slot.dto';
@@ -8,27 +9,34 @@ import { HostSlot, PublicSlot } from './slot.types';
 const STARTS_AT = `to_char(s.starts_at, 'YYYY-MM-DD"T"HH24:MI')`;
 // "Now" expressed in the host's time zone, comparable with the stored TIMESTAMP values.
 const NOW = `(now() AT TIME ZONE $1)`;
+// The slot's real instant (epoch ms), for comparing with Google Calendar's busy times.
+const START_MS = `(extract(epoch FROM s.starts_at AT TIME ZONE $1) * 1000)::float8 AS "startMs"`;
 
 @Injectable()
 export class SlotsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly calendar: GoogleCalendarService,
+  ) {}
 
   /** Upcoming slots for the public booking page. */
-  listUpcoming(): Promise<PublicSlot[]> {
-    return this.db.query<PublicSlot>(
+  async listUpcoming(): Promise<PublicSlot[]> {
+    const rows = await this.db.query<Omit<PublicSlot, 'calendarBusy'> & { startMs: number }>(
       `SELECT s.id, ${STARTS_AT} AS "startsAt", s.duration_minutes AS "durationMinutes",
-              (b.id IS NOT NULL) AS "isBooked"
+              (b.id IS NOT NULL) AS "isBooked", ${START_MS}
        FROM slots s
        LEFT JOIN bookings b ON b.slot_id = s.id
        WHERE s.starts_at > ${NOW}
        ORDER BY s.starts_at`,
       [config.timezone],
     );
+    return this.withCalendar(rows);
   }
 
   /** Upcoming slots including who booked them, for the host dashboard. */
   async listForHost(): Promise<HostSlot[]> {
-    const rows = await this.db.query<PublicSlot & {
+    const rows = await this.db.query<Omit<PublicSlot, 'calendarBusy'> & {
+      startMs: number;
       bookingId: string | null;
       name: string | null;
       email: string | null;
@@ -36,7 +44,7 @@ export class SlotsService {
       bookedAt: string | null;
     }>(
       `SELECT s.id, ${STARTS_AT} AS "startsAt", s.duration_minutes AS "durationMinutes",
-              (b.id IS NOT NULL) AS "isBooked",
+              (b.id IS NOT NULL) AS "isBooked", ${START_MS},
               b.id AS "bookingId", b.name, b.email, b.topic,
               to_char(b.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "bookedAt"
        FROM slots s
@@ -46,7 +54,8 @@ export class SlotsService {
       [config.timezone],
     );
 
-    return rows.map(({ bookingId, name, email, topic, bookedAt, ...slot }) => ({
+    const slots = await this.withCalendar(rows);
+    return slots.map(({ bookingId, name, email, topic, bookedAt, ...slot }) => ({
       ...slot,
       booking: bookingId
         ? { id: bookingId, name: name!, email: email!, topic, createdAt: bookedAt! }
@@ -91,9 +100,18 @@ export class SlotsService {
        SELECT $1::timestamp + make_interval(mins => $2 * i), $2
        FROM generate_series(0, $3 - 1) AS i
        RETURNING id, to_char(starts_at, 'YYYY-MM-DD"T"HH24:MI') AS "startsAt",
-                 duration_minutes AS "durationMinutes", false AS "isBooked"`,
+                 duration_minutes AS "durationMinutes", false AS "isBooked", false AS "calendarBusy"`,
       [start, dto.durationMinutes, count],
     );
+  }
+
+  /** Marks slots that overlap a busy time in the host's Google Calendar. */
+  private async withCalendar<T extends { startMs: number; durationMinutes: number }>(rows: T[]) {
+    const busy = await this.calendar.busyIntervals();
+    return rows.map(({ startMs, ...slot }) => ({
+      ...slot,
+      calendarBusy: overlapsBusy(startMs, startMs + slot.durationMinutes * 60_000, busy),
+    }));
   }
 
   /** Removes a slot (and its booking, if any — the host is cancelling it). */

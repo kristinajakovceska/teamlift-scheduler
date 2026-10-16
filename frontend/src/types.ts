@@ -4,6 +4,8 @@ export interface Slot {
   startsAt: string;
   durationMinutes: number;
   isBooked: boolean;
+  /** Clashes with the host's Google Calendar, so it can't be booked. */
+  calendarBusy: boolean;
 }
 
 export interface HostSlot extends Slot {
@@ -30,6 +32,15 @@ export interface AppConfig {
   hostName: string;
   timezone: string;
   aiEnabled: boolean;
+  calendarEnabled: boolean;
+}
+
+export interface CalendarStatus {
+  enabled: boolean;
+  ok: boolean;
+  calendarId: string | null;
+  error: string | null;
+  checkedAt: string | null;
 }
 
 export interface NewSlotsInput {
